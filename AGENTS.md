@@ -11,6 +11,12 @@ This file provides concise, agent-focused guidance for working in this monorepo.
   - `apps/ssr` – Minimal SSR site for external sharing
 - Shared packages: `packages/internal` (components, atoms, hooks, store, utils, database, etc.).
 
+## Agent goals (this change request)
+
+- Keep the project free and open-source friendly: prefer solutions that do not require paid cloud services to run core features.
+- Reduce dependence on third-party cloud APIs by adding self-hostable / local-first API alternatives behind clean abstractions.
+- Prefer additive changes for easier upstream sync: avoid modifying existing implementations when possible; introduce new modules/files and route integration via small, well-scoped adapter/entry-point changes.
+
 ## Setup commands
 
 ```bash

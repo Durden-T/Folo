@@ -93,11 +93,15 @@ class UserSyncService {
       state.role = res.user?.role as UserRole | null
       // tyler dev only
       state.role = UserRole.Pro
+      state.rsshubSubscriptionLimit = 99999
+      state.feedSubscriptionLimit = 99999
+      /*
       if (res.user?.roleEndAt) {
         state.roleEndAt = new Date(res.user?.roleEndAt)
       }
       state.rsshubSubscriptionLimit = res.rsshubSubscriptionLimit ?? null
       state.feedSubscriptionLimit = res.feedSubscriptionLimit ?? null
+      */
     })
     userActions.upsertMany([user])
 
