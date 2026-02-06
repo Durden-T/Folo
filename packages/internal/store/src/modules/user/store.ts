@@ -91,6 +91,8 @@ class UserSyncService {
     immerSet((state) => {
       state.whoami = { ...user, emailVerified: res.user?.emailVerified ?? false }
       state.role = res.user?.role as UserRole | null
+      // tyler dev only
+      state.role = UserRole.Pro
       if (res.user?.roleEndAt) {
         state.roleEndAt = new Date(res.user?.roleEndAt)
       }
