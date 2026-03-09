@@ -1,6 +1,9 @@
 node_modules
 dist
 out
+.next
+.open-next
+next-env.d.ts
 .DS_Store
 *.log*
 .env
@@ -26,6 +29,9 @@ buildServer.json
 **/**/generated-routes.ts
 
 apps/desktop/build/appxmanifest.xml
+apps/desktop/resources/cli
 
 .claude/settings.local.json
 .serena
+
+.wrangler

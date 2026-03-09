@@ -57,7 +57,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         LSApplicationQueriesSchemes: ["bilibili", "youtube"],
         CFBundleAllowMixedLocalizations: true,
         // apps/mobile/src/@types/constants.ts currentSupportedLanguages
-        CFBundleLocalizations: ["en", "ja", "zh-CN", "zh-TW"],
+        CFBundleLocalizations: ["en", "ja", "zh-CN", "zh-TW", "fr-FR"],
         CFBundleDevelopmentRegion: "en",
       },
       googleServicesFile: "./build/GoogleService-Info.plist",
@@ -137,14 +137,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       require("./plugins/with-android-manifest-plugin.js"),
       "expo-secure-store",
       "@react-native-firebase/app",
-      [
-        "@sentry/react-native/expo",
-        {
-          url: "https://sentry.io/",
-          project: "react-native",
-          organization: "follow-rg",
-        },
-      ],
       [
         "expo-image-picker",
         {
