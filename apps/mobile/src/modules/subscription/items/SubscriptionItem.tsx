@@ -16,6 +16,7 @@ import { ItemPressable } from "@/src/components/ui/pressable/ItemPressable"
 import { Text } from "@/src/components/ui/typography/Text"
 import { WifiOffCuteReIcon } from "@/src/icons/wifi_off_cute_re"
 import { useNavigation } from "@/src/lib/navigation/hooks"
+import { useReadableContainerStyle } from "@/src/lib/responsive"
 import { selectFeed } from "@/src/modules/screen/atoms"
 import { FeedScreen } from "@/src/screens/(stack)/feeds/[feedId]/FeedScreen"
 
@@ -37,6 +38,13 @@ export const SubscriptionItem = memo(
       enabled: !subscription && !feed,
     })
     const navigation = useNavigation()
+    const readableContainerStyle = useReadableContainerStyle(760, GROUPED_LIST_MARGIN)
+    const feedTestID = feed?.url
+      ? `subscription-feed-url-${feed.url
+          .replaceAll(/[^a-z0-9]+/gi, "-")
+          .replaceAll(/^-+|-+$/g, "")
+          .toLowerCase()}`
+      : `subscription-feed-${id}`
     if (isLoading) {
       return (
         <View className="mt-24 flex-1 flex-row items-start justify-center">
@@ -49,9 +57,12 @@ export const SubscriptionItem = memo(
       <>
         <Animated.View
           exiting={FadeOutUp}
-          style={{
-            marginHorizontal: GROUPED_LIST_MARGIN,
-          }}
+          style={[
+            readableContainerStyle,
+            {
+              marginHorizontal: GROUPED_LIST_MARGIN,
+            },
+          ]}
           className={cn("overflow-hidden", {
             "rounded-t-[10px]": isFirst,
             "rounded-b-[10px]": isLast,
@@ -65,6 +76,7 @@ export const SubscriptionItem = memo(
                 inGrouped ? "pl-8 pr-4" : "px-4",
                 className,
               )}
+              testID={feedTestID}
               onPress={() => {
                 selectFeed({
                   type: "feed",

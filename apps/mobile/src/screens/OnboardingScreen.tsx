@@ -1,4 +1,4 @@
-import { isNewUserQueryKey, isOnboardingFinishedStorageKey } from "@follow/store/user/constants"
+import { isNewUserQueryKey } from "@follow/store/user/constants"
 import { tracker } from "@follow/tracker"
 import { useCallback, useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -7,10 +7,11 @@ import Animated, { FadeInRight, FadeOutLeft } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Text } from "@/src/components/ui/typography/Text"
+import { useReadableContainerStyle } from "@/src/lib/responsive"
 
-import { kv } from "../lib/kv"
 import { useNavigation } from "../lib/navigation/hooks"
 import type { NavigationControllerView } from "../lib/navigation/types"
+import { markOnboardingFinished } from "../lib/onboarding"
 import { queryClient } from "../lib/query-client"
 import { StepFinished } from "../modules/onboarding/step-finished"
 import { StepInterests } from "../modules/onboarding/step-interests"
@@ -22,6 +23,7 @@ const ONBOARDING_STEPS = [1, 2, 3, 4]
 export const OnboardingScreen: NavigationControllerView = () => {
   const { t } = useTranslation("common")
   const insets = useSafeAreaInsets()
+  const readableContentStyle = useReadableContainerStyle(680)
   const [currentStep, setCurrentStep] = useState(1)
   const totalSteps = ONBOARDING_STEPS.length
   const navigation = useNavigation()
@@ -38,7 +40,7 @@ export const OnboardingScreen: NavigationControllerView = () => {
         step: currentStep,
         done: true,
       })
-      kv.set(isOnboardingFinishedStorageKey, "true")
+      void markOnboardingFinished()
       queryClient
         .invalidateQueries({
           queryKey: isNewUserQueryKey,
@@ -73,6 +75,7 @@ export const OnboardingScreen: NavigationControllerView = () => {
         key={`step-${currentStep}`}
         exiting={FadeOutLeft}
         entering={FadeInRight}
+        style={readableContentStyle}
       >
         {/* Content */}
         {currentStep === 1 && <StepWelcome />}
@@ -82,8 +85,12 @@ export const OnboardingScreen: NavigationControllerView = () => {
       </Animated.View>
 
       {/* Navigation buttons */}
-      <View className="mb-6 px-6">
-        <Pressable onPress={handleNext} className="w-full items-center rounded-xl bg-accent py-4">
+      <View className="mb-6 px-6" style={readableContentStyle}>
+        <Pressable
+          testID="onboarding-next"
+          onPress={handleNext}
+          className="w-full items-center rounded-xl bg-accent py-4"
+        >
           <Text className="text-lg font-bold text-white">
             {currentStep < totalSteps - 1
               ? t("words.next")

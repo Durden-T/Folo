@@ -18,6 +18,9 @@ import { useContextMenu } from "~/hooks/common/useContextMenu"
 import { resetSelectedFeedIds } from "./atom"
 import { useShowTimelineTabsSettingsModal } from "./TimelineTabsSettingsModal"
 
+const getTimelineTabTestId = (name: string) =>
+  `timeline-tab-${name.split(".").pop()?.replaceAll("_", "-")}`
+
 export function SubscriptionTabButton({
   timelineId,
   shortcut,
@@ -153,6 +156,8 @@ const ViewAllSwitchButton: FC<{
 
   return (
     <ActionButton
+      data-testid={getTimelineTabTestId(item.name)}
+      aria-pressed={isActive}
       shortcutScope={FocusablePresets.isNotFloatingLayerScope}
       key={item.name}
       tooltip={t(item.name, { ns: "common" })}
@@ -214,6 +219,8 @@ const ViewSwitchButton: FC<{
 
   return (
     <ActionButton
+      data-testid={getTimelineTabTestId(item.name)}
+      aria-pressed={isActive}
       shortcutScope={FocusablePresets.isNotFloatingLayerScope}
       ref={setNodeRef}
       key={item.name}

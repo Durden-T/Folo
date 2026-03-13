@@ -1,3 +1,4 @@
+import { useIsLoggedIn } from "@follow/store/user/hooks"
 import type { FC } from "react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { View } from "react-native"
@@ -13,6 +14,7 @@ import { DefaultHeaderBackButton } from "@/src/components/layouts/header/Navigat
 import { NavigationBlurEffectHeader } from "@/src/components/layouts/views/SafeNavigationScrollView"
 import { gentleSpringPreset } from "@/src/constants/spring"
 import { TIMELINE_VIEW_SELECTOR_HEIGHT } from "@/src/constants/ui"
+import { useIsTabletLayout } from "@/src/lib/responsive"
 import {
   ActionGroup,
   FeedShareActionButton,
@@ -27,16 +29,19 @@ import { useEntries, useEntryListContext, useSelectedFeedTitle } from "./atoms"
 export function TimelineHeader({ feedId }: { feedId?: string }) {
   const viewTitle = useSelectedFeedTitle()
   const screenType = useEntryListContext().type
+  const isLoggedIn = useIsLoggedIn()
 
   const isFeed = screenType === "feed"
   const isTimeline = screenType === "timeline"
   const isSubscriptions = screenType === "subscriptions"
+  const isTablet = useIsTabletLayout()
 
   const { isFetching } = useEntries()
+  const shouldHideDuplicatedTitle = isTablet && (isTimeline || isSubscriptions)
 
   return (
     <NavigationBlurEffectHeader
-      headerTitle={<AnimatedTitle title={viewTitle} />}
+      headerTitle={shouldHideDuplicatedTitle ? undefined : <AnimatedTitle title={viewTitle} />}
       isLoading={(isFeed || isTimeline) && isFetching}
       headerLeft={useMemo(
         () =>
@@ -49,13 +54,13 @@ export function TimelineHeader({ feedId }: { feedId?: string }) {
         return () => (
           <View className="flex-row items-center justify-end">
             <ActionGroup>
-              <UnreadOnlyActionButton />
-              <MarkAllAsReadActionButton />
+              {isLoggedIn && <UnreadOnlyActionButton />}
+              {isLoggedIn && <MarkAllAsReadActionButton />}
               <FeedShareActionButton feedId={feedId} />
             </ActionGroup>
           </View>
         )
-      }, [feedId])}
+      }, [feedId, isLoggedIn])}
       headerHideableBottom={isTimeline || isSubscriptions ? TimelineViewSelector : undefined}
       headerHideableBottomHeight={TIMELINE_VIEW_SELECTOR_HEIGHT}
     />

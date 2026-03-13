@@ -1,7 +1,7 @@
 {
   "name": "Folo",
   "type": "module",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "private": true,
   "description": "Follow everything in one place",
   "author": "Folo Team",
@@ -29,6 +29,12 @@
     "dev:electron": "electron-vite dev",
     "dev:server": "pnpm run --filter=ssr dev",
     "dev:web": "cross-env WEB_BUILD=1 vite",
+    "e2e": "playwright test -c e2e/playwright.config.ts",
+    "e2e:electron": "playwright test -c e2e/playwright.config.ts --project=electron",
+    "e2e:electron:prod": "cross-env FOLO_E2E_PROFILE=prod playwright test -c e2e/playwright.config.ts --project=electron",
+    "e2e:install": "playwright install chromium",
+    "e2e:web": "playwright test -c e2e/playwright.config.ts --project=web",
+    "e2e:web:prod": "cross-env FOLO_E2E_PROFILE=prod playwright test -c e2e/playwright.config.ts --project=web",
     "hotfix": "vv -c bump.hotfix.config.js --patch",
     "prepare:cli": "tsx scripts/prepare-cli.ts",
     "publish": "electron-vite build && electron-forge publish",
@@ -53,6 +59,7 @@
     "@follow/shared": "workspace:*",
     "@follow/utils": "workspace:*",
     "@pengx17/electron-forge-maker-appimage": "1.2.1",
+    "@playwright/test": "1.58.2",
     "@types/html-minifier-terser": "7.0.2",
     "@types/js-yaml": "4.0.9",
     "@vitejs/plugin-legacy": "7.2.1",
@@ -88,5 +95,5 @@
     "vite-tsconfig-paths": "6.1.1"
   },
   "productName": "Folo",
-  "mainHash": "906a0b82e00829115764f36a38132f3774120c4bea764e3b1be8949f447ccb06"
+  "mainHash": "0c464fca7c98fd4b42abba743abb1cd590e216043987acf4f6d1e10392ce0e57"
 }

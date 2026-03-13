@@ -20,7 +20,7 @@ import { ReAnimatedScrollView } from "../../common/AnimatedComponents"
 import type { InternalNavigationHeaderProps } from "../header/NavigationHeader"
 import { InternalNavigationHeader } from "../header/NavigationHeader"
 import { BottomTabBarBackgroundContext } from "../tabbar/contexts/BottomTabBarBackgroundContext"
-import { getDefaultHeaderHeight } from "../utils"
+import { getNavigationHeaderLayout } from "../utils"
 import {
   NavigationHeaderHeightContext,
   SetNavigationHeaderHeightContext,
@@ -38,6 +38,7 @@ type SafeNavigationScrollViewProps = Omit<ScrollViewProps, "onScroll"> & {
 
   contentViewStyle?: StyleProp<ViewStyle>
   contentViewClassName?: string
+  contentContainerMaxWidth?: number
 
   Header?: React.ReactNode
   ScrollViewBottom?: React.ReactNode
@@ -55,6 +56,7 @@ export const SafeNavigationScrollView = ({
   reanimatedScrollY,
   contentViewClassName,
   contentViewStyle,
+  contentContainerMaxWidth,
   Header,
   ScrollViewBottom,
   ...props
@@ -63,13 +65,17 @@ export const SafeNavigationScrollView = ({
   const tabBarHeight = useBottomTabBarHeight()
 
   const frame = useSafeAreaFrame()
+  const resolvedContentContainerWidth = contentContainerMaxWidth
+    ? Math.min(frame.width, contentContainerMaxWidth)
+    : undefined
   const sheetModal = useScreenIsInSheetModal()
-  const [headerHeight, setHeaderHeight] = useState(() =>
-    getDefaultHeaderHeight({
-      landscape: frame.width > frame.height,
-      modalPresentation: sheetModal,
-      topInset: insets.top,
-    }),
+  const [headerHeight, setHeaderHeight] = useState(
+    () =>
+      getNavigationHeaderLayout({
+        landscape: frame.width > frame.height,
+        sheetModal,
+        topInset: insets.top,
+      }).headerHeight,
   )
   const screenCtxValue = use(ScreenItemContext)
 
@@ -139,7 +145,18 @@ export const SafeNavigationScrollView = ({
           {...props}
         >
           <View style={{ height: headerHeight - (withTopInset ? insets.top : 0) }} />
-          <View style={contentViewStyle} className={cn("flex-1", contentViewClassName)}>
+          <View
+            style={[
+              contentContainerMaxWidth
+                ? {
+                    width: resolvedContentContainerWidth,
+                    alignSelf: "center",
+                  }
+                : undefined,
+              contentViewStyle,
+            ]}
+            className={cn("flex-1", contentViewClassName)}
+          >
             {children}
           </View>
           {ScrollViewBottom}
