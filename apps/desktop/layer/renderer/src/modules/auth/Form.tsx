@@ -200,7 +200,7 @@ export function LoginWithPassword({
         const token = getAuthTokenFromResult(res)
         if (token) {
           setAuthSessionToken(token)
-          void setElectronSessionToken(token)
+          await setElectronSessionToken(token)
         }
       }
       handleSessionChanges()
@@ -372,18 +372,20 @@ export function RegisterForm({
             headers,
           }),
         )
-      : await signUp.email({
-          email: values.email,
-          password: values.password,
-          name: values.email.split("@")[0]!,
-          callbackURL: "/",
-          fetchOptions: {
+      : await signUp.email(
+          {
+            email: values.email,
+            password: values.password,
+            name: values.email.split("@")[0]!,
+            callbackURL: "/",
+          },
+          {
             onError(context) {
               toast.error(context.error.message)
             },
             headers,
           },
-        })
+        )
 
     if (result?.error) {
       return result
@@ -393,7 +395,7 @@ export function RegisterForm({
       const token = getAuthTokenFromResult(result)
       if (token) {
         setAuthSessionToken(token)
-        void setElectronSessionToken(token)
+        await setElectronSessionToken(token)
       }
     }
 
