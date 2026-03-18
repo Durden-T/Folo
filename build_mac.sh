@@ -7,6 +7,8 @@ APP_NAME="Folo"
 
 cd "$ROOT_DIR"
 
+git pull
+
 # 目标：本机可安装/可双击的 macOS 构建产物（不用于分发）。
 # 说明：本仓库的 Forge 配置对 darwin 会生成 zip/dmg；对 mas 会生成 pkg（需要证书）。
 # 为了避免“没有证书导致 codesign 失败”，这里默认使用 ad-hoc 签名（identity='-').
@@ -33,9 +35,9 @@ pnpm -C apps/desktop run build:electron
 
 ARCH_RAW="$(uname -m)"
 case "$ARCH_RAW" in
-  arm64) ARCH="arm64" ;;
-  x86_64) ARCH="x64" ;;
-  *) ARCH="$ARCH_RAW" ;;
+arm64) ARCH="arm64" ;;
+x86_64) ARCH="x64" ;;
+*) ARCH="$ARCH_RAW" ;;
 esac
 
 ZIP_DIR="$ROOT_DIR/apps/desktop/out/make/zip/darwin/$ARCH"
