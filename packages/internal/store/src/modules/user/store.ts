@@ -1,4 +1,4 @@
-import { UserRole } from "@follow/constants"
+import type { UserRole } from "@follow/constants"
 import type { UserSchema } from "@follow/database/schemas/types"
 import { UserService } from "@follow/database/services/user"
 import type { AuthUser } from "@follow-app/client-sdk"
@@ -51,10 +51,10 @@ class UserSyncService {
         immerSet((state) => {
           for (const user of usersArray) {
             state.users[user.id] = {
+              ...user,
               email: null,
               isMe: whoami?.id === user.id,
-              ...user,
-            }
+            } as UserModel
           }
         })
         return usersObject
@@ -103,7 +103,7 @@ class UserSyncService {
       state.feedSubscriptionLimit = res.feedSubscriptionLimit ?? null
       */
     })
-    userActions.upsertMany([user])
+    userActions.upsertMany([user as unknown as UserModel])
 
     return res
   }
@@ -133,7 +133,7 @@ class UserSyncService {
         ...whoami,
         ...data,
       }
-      userActions.upsertMany([nextUser])
+      userActions.upsertMany([nextUser as unknown as UserModel])
     })
     tx.rollback(() => {
       immerSet((state) => {
@@ -195,20 +195,9 @@ class UserSyncService {
     tx.persist(async () => {
       const { whoami } = get()
       if (!whoami) return
-      userActions.upsertMany([{ ...whoami, email }])
+      userActions.upsertMany([{ ...whoami, email } as unknown as UserModel])
     })
     await tx.run()
-  }
-
-  async applyInvitationCode(code: string) {
-    const res = await api().invitations.use({ code })
-    if (res.code === 0) {
-      immerSet((state) => {
-        state.role = UserRole.Pro
-      })
-    }
-
-    return res
   }
 
   async fetchUser(userId: string | undefined) {

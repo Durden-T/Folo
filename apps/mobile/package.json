@@ -1,6 +1,6 @@
 {
   "name": "@follow/mobile",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "main": "src/main.tsx",
   "scripts": {
@@ -80,6 +80,7 @@
     "expo-linking": "8.0.11",
     "expo-localization": "17.0.8",
     "expo-media-library": "18.2.1",
+    "expo-network": "8.0.8",
     "expo-notifications": "0.32.16",
     "expo-secure-store": "15.0.8",
     "expo-sharing": "14.0.8",
