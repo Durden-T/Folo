@@ -1,13 +1,14 @@
 import { existsSync, readFileSync } from "node:fs"
-import { mkdir, readdir, rename, rm, stat, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from "node:fs/promises"
 import os from "node:os"
+import { URL } from "node:url"
 
 import { callWindowExpose } from "@follow/shared/bridge"
-import type { LatestReleasePayload, RendererUpdate } from "@follow-app/client-sdk"
-import { mainHash, version as appVersion } from "@pkg"
+import { runtimeVersion as configuredRuntimeVersion, version as appVersion } from "@pkg"
 import log from "electron-log"
 import { dump, load } from "js-yaml"
 import path from "pathe"
+import { compare } from "semver"
 import { x } from "tar"
 
 import { HOTUPDATE_RENDER_ENTRY_DIR } from "~/constants/app"
@@ -15,11 +16,17 @@ import { downloadFileWithProgress } from "~/lib/download"
 import { WindowManager } from "~/manager/window"
 
 import { appUpdaterConfig } from "./configs"
+import type { DesktopManifestResponse, DesktopRendererPayload } from "./types"
+import { manifestHashToHex } from "./types"
 
-declare const GIT_COMMIT_HASH: string | undefined
-
-export type RendererManifest = RendererUpdate & {
+export type RendererManifest = {
+  runtimeVersion: string
+  version: string
+  releaseVersion: string
+  commit: string
   downloadUrl: string
+  hash: string
+  filename: string
   downloadedAt?: string
 }
 
@@ -36,24 +43,63 @@ export interface RendererEligibilityResult {
   reason?: string
 }
 
+const getCurrentRendererContext = () => ({
+  appVersion,
+  runtimeVersion: configuredRuntimeVersion ?? appVersion,
+})
+
+const normalizeRendererVersion = (version?: null | string) => {
+  const normalized = version?.split("-")[0]?.trim()
+  if (!normalized) {
+    return null
+  }
+
+  return /^\d+\.\d+\.\d+$/.test(normalized) ? normalized : null
+}
+
+const compareRendererVersions = (left?: null | string, right?: null | string) => {
+  const normalizedLeft = normalizeRendererVersion(left)
+  const normalizedRight = normalizeRendererVersion(right)
+
+  if (!normalizedLeft || !normalizedRight) {
+    return null
+  }
+
+  return compare(normalizedLeft, normalizedRight)
+}
+
+export const isRendererManifestUsable = (
+  manifest: null | Partial<Pick<RendererManifest, "runtimeVersion" | "version">>,
+  input: { appVersion: string; runtimeVersion: string },
+) => {
+  if (!manifest?.runtimeVersion || manifest.runtimeVersion !== input.runtimeVersion) {
+    return false
+  }
+
+  const versionComparison = compareRendererVersions(manifest.version, input.appVersion)
+  if (versionComparison === null) {
+    return false
+  }
+
+  return versionComparison >= 0
+}
+
 class RendererHotUpdater {
   private readonly logger = log.scope("updater:renderer")
   private readonly tempDir = path.resolve(os.tmpdir(), "follow-render-update")
   private readonly manifestPath = path.resolve(HOTUPDATE_RENDER_ENTRY_DIR, "manifest.yml")
 
-  extractManifest(payload: LatestReleasePayload | null): RendererManifest | null {
+  extractManifest(payload: DesktopManifestResponse | null): RendererManifest | null {
     if (!payload) return null
 
-    const { decision } = payload
-    if (!decision || decision.type !== "renderer") {
-      return null
-    }
-
-    return this.toManifest(decision.renderer)
+    return this.toManifest(payload.renderer, payload.runtimeVersion)
   }
 
-  extractManifestFromRendererUpdate(renderer: RendererUpdate | null): RendererManifest | null {
-    return this.toManifest(renderer)
+  extractManifestFromRendererUpdate(
+    renderer: DesktopRendererPayload | null,
+    runtimeVersion: string,
+  ): RendererManifest | null {
+    return this.toManifest(renderer, runtimeVersion)
   }
 
   evaluateManifest(manifest: RendererManifest | null): RendererEligibilityResult {
@@ -61,46 +107,44 @@ class RendererHotUpdater {
       return { status: RendererEligibilityStatus.NoManifest }
     }
 
-    if (manifest.mainHash && manifest.mainHash !== mainHash) {
+    const appRuntimeVersion = configuredRuntimeVersion ?? appVersion
+    if (manifest.runtimeVersion !== appRuntimeVersion) {
       return {
         status: RendererEligibilityStatus.RequiresFullAppUpdate,
         manifest,
-        reason: `Renderer payload requires main hash ${manifest.mainHash}, current main hash is ${mainHash}`,
+        reason: `Renderer payload requires runtimeVersion ${manifest.runtimeVersion}, current runtimeVersion is ${appRuntimeVersion}`,
       }
     }
 
-    if (manifest.version === appVersion) {
+    const versionComparison = compareRendererVersions(manifest.version, appVersion)
+    if (versionComparison === null) {
+      return {
+        status: RendererEligibilityStatus.NoManifest,
+        manifest,
+        reason: `Renderer payload version ${manifest.version} is invalid`,
+      }
+    }
+
+    if (versionComparison < 0) {
+      return {
+        status: RendererEligibilityStatus.AlreadyCurrent,
+        manifest,
+        reason: `Renderer version ${manifest.version} is older than current app version ${appVersion}`,
+      }
+    }
+
+    if (versionComparison === 0) {
       return {
         status: RendererEligibilityStatus.AlreadyCurrent,
         reason: "Renderer version matches current app version",
       }
     }
 
-    if (manifest.commit && GIT_COMMIT_HASH && manifest.commit === GIT_COMMIT_HASH) {
+    const installedManifest = this.getCurrentManifest()
+    if (installedManifest && installedManifest.version === manifest.version) {
       return {
         status: RendererEligibilityStatus.AlreadyCurrent,
-        reason: "Renderer commit matches current main commit",
-      }
-    }
-
-    const installedManifest = this.getCurrentManifest()
-    if (installedManifest) {
-      if (installedManifest.version === manifest.version) {
-        return {
-          status: RendererEligibilityStatus.AlreadyCurrent,
-          reason: "Installed renderer manifest already at target version",
-        }
-      }
-
-      if (
-        installedManifest.commit &&
-        manifest.commit &&
-        installedManifest.commit === manifest.commit
-      ) {
-        return {
-          status: RendererEligibilityStatus.AlreadyCurrent,
-          reason: "Installed renderer manifest commit matches target commit",
-        }
+        reason: "Installed renderer manifest already at target version",
       }
     }
 
@@ -110,30 +154,39 @@ class RendererHotUpdater {
     }
   }
 
-  private toManifest(renderer: RendererUpdate | null): RendererManifest | null {
+  private toManifest(
+    renderer: DesktopRendererPayload | null,
+    runtimeVersion: string,
+  ): RendererManifest | null {
     if (!renderer) {
       this.logger.debug("Renderer decision payload missing renderer field")
       return null
     }
 
-    if (!renderer.downloadUrl) {
+    if (!renderer.launchAsset?.url) {
       this.logger.warn("Renderer decision missing downloadUrl, skip renderer hot update")
       return null
     }
 
-    if (!renderer.filename) {
+    const filename = this.resolveFilename(renderer.launchAsset.url)
+    if (!filename) {
       this.logger.warn("Renderer decision missing filename, skip renderer hot update")
       return null
     }
 
-    if (!renderer.hash) {
+    if (!renderer.launchAsset.hash) {
       this.logger.warn("Renderer decision missing hash, skip renderer hot update")
       return null
     }
 
     return {
-      ...renderer,
-      downloadUrl: renderer.downloadUrl,
+      runtimeVersion,
+      version: renderer.version,
+      releaseVersion: renderer.releaseVersion,
+      commit: renderer.commit,
+      downloadUrl: renderer.launchAsset.url,
+      filename,
+      hash: manifestHashToHex(renderer.launchAsset.hash),
     }
   }
 
@@ -144,16 +197,18 @@ class RendererHotUpdater {
     }
 
     const archivePath = await this.downloadArchive(manifest)
+    const stagingRoot = await mkdtemp(path.resolve(this.tempDir, "extract-"))
+    const stagingDir = path.resolve(stagingRoot, "content")
 
-    await mkdir(HOTUPDATE_RENDER_ENTRY_DIR, { recursive: true })
-    this.logger.info(`Extracting renderer bundle to ${HOTUPDATE_RENDER_ENTRY_DIR}`)
+    await mkdir(stagingDir, { recursive: true })
+    this.logger.info(`Extracting renderer bundle to ${stagingDir}`)
 
     await x({
       f: archivePath,
-      cwd: HOTUPDATE_RENDER_ENTRY_DIR,
+      cwd: stagingDir,
     })
 
-    const extractedDir = path.resolve(HOTUPDATE_RENDER_ENTRY_DIR, "renderer")
+    const extractedDir = path.resolve(stagingDir, "renderer")
     const targetDir = path.resolve(HOTUPDATE_RENDER_ENTRY_DIR, manifest.version)
 
     const extractedStats = await stat(extractedDir).catch(() => null)
@@ -162,6 +217,7 @@ class RendererHotUpdater {
     }
 
     await rm(targetDir, { recursive: true, force: true })
+    await mkdir(HOTUPDATE_RENDER_ENTRY_DIR, { recursive: true })
     await rename(extractedDir, targetDir)
 
     await this.writeManifest({ ...manifest, downloadedAt: new Date().toISOString() })
@@ -170,6 +226,12 @@ class RendererHotUpdater {
       await rm(archivePath, { force: true })
     } catch (error) {
       this.logger.warn("Failed to clean renderer archive", error)
+    }
+
+    try {
+      await rm(stagingRoot, { recursive: true, force: true })
+    } catch (error) {
+      this.logger.warn("Failed to clean renderer staging directory", error)
     }
 
     this.logger.info(`Renderer hot update applied successfully: ${manifest.version}`)
@@ -200,7 +262,7 @@ class RendererHotUpdater {
 
   async cleanup(): Promise<void> {
     const manifest = this.getCurrentManifest()
-    if (!manifest) {
+    if (!manifest || !isRendererManifestUsable(manifest, getCurrentRendererContext())) {
       await rm(HOTUPDATE_RENDER_ENTRY_DIR, { recursive: true, force: true })
       return
     }
@@ -231,7 +293,9 @@ class RendererHotUpdater {
 
     const manifest = this.getCurrentManifest()
     if (!manifest) return
-    if (manifest.mainHash && manifest.mainHash !== mainHash) return
+    if (!isRendererManifestUsable(manifest, getCurrentRendererContext())) {
+      return
+    }
 
     const dir = path.resolve(HOTUPDATE_RENDER_ENTRY_DIR, manifest.version)
     const entryFile = path.resolve(dir, "index.html")
@@ -263,6 +327,14 @@ class RendererHotUpdater {
 
   private async writeManifest(manifest: RendererManifest) {
     await writeFile(this.manifestPath, dump(manifest), "utf-8")
+  }
+
+  private resolveFilename(url: string) {
+    try {
+      return new URL(url).pathname.split("/").pop() ?? null
+    } catch {
+      return null
+    }
   }
 }
 
