@@ -25,6 +25,7 @@ const storagePrefix = "follow_auth"
 export const cookieKey = `${storagePrefix}_cookie`
 export const sessionTokenKey = "__Secure-better-auth.session_token"
 const sessionDataKey = `${storagePrefix}_session_data`
+const sessionCookieRefreshIntervalSeconds = 60 * 60 * 12
 
 let authStateRevision = 0
 let lastAuthStateChangeAt = 0
@@ -115,6 +116,10 @@ const plugins = [
 
 export const authClient = createAuthClient({
   baseURL: `${proxyEnv.API_URL}/better-auth`,
+  sessionOptions: {
+    refetchInterval: sessionCookieRefreshIntervalSeconds,
+    refetchOnWindowFocus: true,
+  },
   fetchOptions: {
     cache: "no-store",
     // Learn more: https://better-fetch.vercel.app/docs/hooks
@@ -169,6 +174,11 @@ export const {
   useSession,
 } = authClient
 
+// Mount Better Auth's session atom so the Expo plugin can persist refreshed Set-Cookie metadata.
+export const useAuthSessionCookieRefresh = () => {
+  useSession()
+}
+
 export const forgetPassword = authClient.requestPasswordReset
 
 export interface AuthProvider {
@@ -199,20 +209,30 @@ export function isAuthCodeValid(authCode: string) {
   )
 }
 
-export const signOut = async () => {
-  await authClient.signOut()
-  safeSecureStore.removeItem(cookieKey)
-  safeSecureStore.removeItem(sessionTokenKey)
-  safeSecureStore.removeItem(sessionDataKey)
+const clearAuthStorage = async () => {
+  const keys = [cookieKey, sessionTokenKey, sessionDataKey]
   if (__DEV__) {
-    safeSecureStore.removeItem(`${cookieKey}_${getEnvProfile()}`)
+    keys.push(`${cookieKey}_${getEnvProfile()}`)
   }
+
+  await Promise.all(keys.map((key) => safeSecureStore.removeItemAsync(key)))
+}
+
+export const signOut = async () => {
+  try {
+    await authClient.signOut()
+  } catch (error) {
+    console.warn(
+      `[auth] Remote sign out failed: ${error instanceof Error ? error.message : String(error)}`,
+    )
+  }
+  await clearAuthStorage()
   await userActions.removeCurrentUser()
   Navigation.rootNavigation.popToRoot()
   bumpAuthStateRevision()
   await refreshSessionQueries()
   const dbPath = getDbPath()
-  await FileSystem.deleteAsync(dbPath)
+  await FileSystem.deleteAsync(dbPath, { idempotent: true })
   await expo.reloadAppAsync("User sign out")
 }
 
