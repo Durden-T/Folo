@@ -14,7 +14,7 @@ import { createObsidianFrontmatter } from "./obsidian-frontmatter"
 // Taken from https://github.com/rollup/rollup/blob/4f69d33af3b2ec9320c43c9e6c65ea23a02bdde3/src/utils/sanitizeFileName.ts
 // https://datatracker.ietf.org/doc/html/rfc2396
 // eslint-disable-next-line no-control-regex
-const INVALID_CHAR_REGEX = /[\u0000-\u001F"#$%&*+,:;<=>?[\]^`{|}\u007F]/g
+const INVALID_CHAR_REGEX = /[\u0000-\u001F"#$%&*+,:;<=>?[\]^`{|}\u007F/\\]/g
 const DRIVE_LETTER_REGEX = /^[a-z]:/i
 
 function sanitizeFileName(name: string): string {
@@ -30,6 +30,10 @@ function sanitizeFileName(name: string): string {
 interface SaveToEagleInput {
   url: string
   mediaUrls: string[]
+}
+
+interface SetEagleContextMenuEnabledInput {
+  enabled: boolean
 }
 
 interface LoginToQBittorrentInput {
@@ -53,6 +57,29 @@ interface CustomFetchInput {
   headers: Record<string, string>
   body?: string
   timeout?: number
+}
+
+export async function saveMediaToEagle(input: SaveToEagleInput): Promise<any> {
+  try {
+    const res = await fetch("http://localhost:41595/api/item/addFromURLs", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        items: input.mediaUrls?.map((media) => ({
+          url: media,
+          website: input.url,
+          headers: {
+            referer: input.url,
+          },
+        })),
+      }),
+    })
+    return await res.json()
+  } catch {
+    return null
+  }
 }
 
 export class IntegrationService extends IpcService {
@@ -125,26 +152,12 @@ ${content}
 
   @IpcMethod()
   async saveToEagle(context: IpcContext, input: SaveToEagleInput): Promise<any> {
-    try {
-      const res = await fetch("http://localhost:41595/api/item/addFromURLs", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          items: input.mediaUrls?.map((media) => ({
-            url: media,
-            website: input.url,
-            headers: {
-              referer: input.url,
-            },
-          })),
-        }),
-      })
-      return await res.json()
-    } catch {
-      return null
-    }
+    return saveMediaToEagle(input)
+  }
+
+  @IpcMethod()
+  setEagleContextMenuEnabled(context: IpcContext, input: SetEagleContextMenuEnabledInput): void {
+    store.set("eagleContextMenuEnabled", input.enabled)
   }
 
   @IpcMethod()
